@@ -41,6 +41,12 @@ pub struct Renderer {
     for_loops: Vec<ForLoop>
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct RenderError {
+    pub message : String 
+}
+
+
 impl Renderer {
     pub fn new(ast: Node, context: Context) -> Renderer {
         Renderer {
@@ -313,12 +319,12 @@ impl Renderer {
         }
     }
 
-    pub fn render(&mut self) -> String {
+    pub fn render(&mut self) -> Result<String, RenderError> {
         for node in self.ast.get_children() {
             self.render_node(*node);
         }
 
-        self.output.clone()
+        Ok(self.output.clone())
     }
 }
 
@@ -330,13 +336,19 @@ mod tests {
     #[test]
     fn test_render_simple_string() {
         let result = Template::new("", "<h1>Hello world</h1>").render(Context::new());
-        assert_eq!(result, "<h1>Hello world</h1>".to_owned());
+        assert_eq!(result, Ok("<h1>Hello world</h1>".to_owned()));
     }
+
+    //#[test]
+    //fn test_render_missing_object() {
+    //    let result = Template::new("", "<h1>{{ product.nonexistent_field }}</h1>").render(Context::new());
+    //    assert!(!result.is_ok());
+    //}
 
     #[test]
     fn test_render_math() {
         let result = Template::new("", "This is {{ 2000 + 16 }}.").render(Context::new());
-        assert_eq!(result, "This is 2016.".to_owned());
+        assert_eq!(result, Ok("This is 2016.".to_owned()));
     }
 
     #[test]
@@ -345,7 +357,7 @@ mod tests {
         context.add("name", &"Vincent");
 
         let result = Template::new("", "My name is {{ name }}.").render(context);
-        assert_eq!(result, "My name is Vincent.".to_owned());
+        assert_eq!(result, Ok("My name is Vincent.".to_owned()));
     }
 
     #[test]
@@ -354,7 +366,7 @@ mod tests {
         context.add("vat_rate", &0.20);
 
         let result = Template::new("", "Vat: £{{ 100 * vat_rate }}.").render(context);
-        assert_eq!(result, "Vat: £20.".to_owned());
+        assert_eq!(result, Ok("Vat: £20.".to_owned()));
     }
 
     #[test]
@@ -363,7 +375,7 @@ mod tests {
         context.add("is_admin", &true);
 
         let result = Template::new("", "{% if is_admin %}Admin{% endif %}").render(context);
-        assert_eq!(result, "Admin".to_owned());
+        assert_eq!(result, Ok("Admin".to_owned()));
     }
 
     #[test]
@@ -376,7 +388,7 @@ mod tests {
             "",
             "{% if is_adult || age + 1 > 18 %}Adult{% endif %}"
         ).render(context);
-        assert_eq!(result, "Adult".to_owned());
+        assert_eq!(result, Ok("Adult".to_owned()));
     }
 
     #[test]
@@ -386,7 +398,7 @@ mod tests {
         context.add("age", &18);
 
         let result = Template::new("", "{% if is_adult && age == 18 %}Adult{% endif %}").render(context);
-        assert_eq!(result, "Adult".to_owned());
+        assert_eq!(result, Ok("Adult".to_owned()));
     }
 
     #[test]
@@ -395,7 +407,7 @@ mod tests {
         context.add("data", &vec![1,2,3]);
 
         let result = Template::new("", "{% for i in data %}{{i}}{% endfor %}").render(context);
-        assert_eq!(result, "123".to_owned());
+        assert_eq!(result, Ok("123".to_owned()));
     }
 
 }
