@@ -38,7 +38,8 @@ pub struct Renderer {
     output: String,
     context: Json,
     ast: Node,
-    for_loops: Vec<ForLoop>
+    for_loops: Vec<ForLoop>,
+    render_error: Option<RenderError>
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -54,15 +55,16 @@ impl Renderer {
             ast: ast,
             context: context.as_json(),
             for_loops: vec![],
+            render_error: None
         }
     }
 
     // Lookup a variable name from the context and takes into
     // account for loops variables
-    fn lookup_variable(&self, key: &str) -> Json {
+    fn lookup_variable(&self, key: &str) -> Option<Json> {
         if self.for_loops.is_empty() {
             // TODO: no unwrap here
-            return self.context.lookup(key).cloned().unwrap();
+            return self.context.lookup(key).cloned();
         }
 
         for for_loop in self.for_loops.iter().rev() {
@@ -72,15 +74,15 @@ impl Renderer {
                 // might be a struct or some nested structure
                 if key.contains(".") {
                     let new_key = key.split_terminator(".").skip(1).collect::<Vec<&str>>().join(".");
-                    return value.lookup(&new_key).cloned().unwrap();
+                    return value.lookup(&new_key).cloned();
                 } else {
-                    return value.clone();
+                    return Some(value.clone());
                 }
             }
         }
 
         // TODO: no unwrap here
-        return self.context.lookup(key).cloned().unwrap();
+        return self.context.lookup(key).cloned();
     }
 
     fn eval_math(&self, node: &Node) -> f32 {
@@ -235,8 +237,15 @@ impl Renderer {
     fn render_variable_block(&mut self, node: Node) {
         match node.specific {
             Identifier(ref s) => {
-                let value = self.lookup_variable(s);
-                self.output.push_str(&value.render());
+                if let Some(value) = self.lookup_variable(s)  {
+                    let v = value.render();
+                    self.output.push_str(&v);    
+                }
+                else {
+                    self.render_error = Some(RenderError {message : format!("Identifier not initialized: {}", s)});
+                    return;
+                }
+                
             },
             Math { .. } => {
                 let result = self.eval_math(&node);
@@ -281,7 +290,8 @@ impl Renderer {
         };
         // TODO: no unwrap
         println!("{:?}", array_name);
-        let list = self.lookup_variable(&array_name);
+        let list = self.lookup_variable(&array_name).unwrap();
+
 
         if !list.is_array() {
             panic!("{:?} is not an array! can't iterate on it", list);
