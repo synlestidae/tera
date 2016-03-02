@@ -234,22 +234,25 @@ impl Renderer {
     }
 
     // eval all the values in a  {{ }} block
-    fn render_variable_block(&mut self, node: Node) {
+    fn render_variable_block(&mut self, node: Node) -> Result<String, RenderError> {
         match node.specific {
             Identifier(ref s) => {
                 if let Some(value) = self.lookup_variable(s)  {
                     let v = value.render();
                     self.output.push_str(&v);    
+                    return Ok(v);
                 }
                 else {
-                    self.render_error = Some(RenderError {message : format!("Identifier not initialized: {}", s)});
-                    return;
+                    return Err(RenderError {
+                        message : format!("Identifier not initialized: {}", s)
+                    });
                 }
                 
             },
             Math { .. } => {
-                let result = self.eval_math(&node);
-                self.output.push_str(&result.to_string());
+                let result_string = self.eval_math(&node).to_string();
+                self.output.push_str(&result_string);
+                return Ok(result_string);
             }
             _ => unreachable!()
         }
@@ -275,7 +278,7 @@ impl Renderer {
         }
 
         if let Some(e) = else_node {
-            self.render_node(*e)
+            self.render_node(*e);
         };
     }
 
@@ -310,10 +313,10 @@ impl Renderer {
         }
     }
 
-    pub fn render_node(&mut self, node: Node) {
+    pub fn render_node(&mut self, node: Node) -> Result<String, RenderError> {
         match node.specific {
             Text(ref s) => self.output.push_str(s),
-            VariableBlock(s) => self.render_variable_block(*s),
+            VariableBlock(s) => {self.render_variable_block(*s);},
             If {ref condition_nodes, ref else_node} => {
                 self.render_if(condition_nodes.clone(), else_node.clone());
             },
@@ -327,6 +330,8 @@ impl Renderer {
             },
             _ => panic!("woo {:?}", node)
         }
+
+        Ok(self.output.to_string())
     }
 
     pub fn render(&mut self) -> Result<String, RenderError> {
